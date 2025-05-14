@@ -51,7 +51,22 @@ urlpatterns = [
     path('api/add_teacher/', views.add_teacher),
     path('api/updated_teacher/<str:teacher_id>', views.update_teacher),
     path('api/deleted_teacher/<str:teacher_id>', views.archive_teacher),
-    path('api/hr/', views.get_all_hrs, name='get_all_hr'),                    
+    path('api/hr/', views.get_all_hrs, name='get_all_hr'),   
+    path('api/user_profile/', views.get_user_profile, name='get_user_profile'),                 
+    path('profile/upload-resume/', views.upload_resume, name='upload_resume'), 
+    path('profile/delete-resume/', views.delete_resume, name='delete_resume'), 
+    path('profile/download-resume/', views.download_resume, name='download_resume'), 
+  
+    path('api/jobs1/', views.get_all_jobs1, name='get_all_jobs1'),
+    # path('api/jobs1/fetch/', views.fetch_and_store_jobs, name='fetch_and_store_jobs'),
+    
+    
+    path('api/jobs/', views.get_all_jobs, name='get_all_jobs'),
+    path('api/jobs/search/', views.search_jobs, name='search_jobs'),
+    path('api/apply_job/', views.apply_job, name='apply_job'),
+    path('api/check_applied/', views.check_applied, name='check_applied'),
+     
+    path('api/profile_update/', views.update_user_profile, name='update_user_profile'),                 
     path('api/add_hr/', views.add_hr, name='add_hr'),                        
     path('api/update_hr/<str:id>/', views.update_hr, name='update_hr'),      
     path('api/delete_hr/<str:id>/', views.archive_hr, name='archive_hr'),
@@ -62,6 +77,16 @@ urlpatterns = [
     path('api/create_blog/', views.create_blog), 
     path('api/viewblogs/<str:blog_id>/', views.get_blog_by_id, name='get_blog_by_id'),  # GET one blog by ID
     path('api/updateblogs/<str:blog_id>/', views.update_blog, name='update_blog'),
-    
+    path('api/courses/<str:course_id>/status/', views.update_course_status, name='update-course-status'),
+    path('api/courses/<str:course_id>/', views.delete_course, name='delete-course'),
+    path('api/blogs/<str:blog_id>/status/', views.update_blog_status, name='update-blog-status'),
+    path('api/blogs/<str:blog_id>/', views.delete_blog, name='delete-blog'),
+    path('api/tests/<str:test_id>/status/', views.update_test_status, name='update-test-status'),
+    path('api/tests/<str:test_id>/delete/', views.delete_test, name='delete-test'),
+     path('api/admin/dashboard/stats', views.admin_dashboard_stats, name='admin_dashboard_stats'),
+    path('api/admin/dashboard/user-growth', views.user_growth_data, name='user_growth_data'),
+    path('api/admin/dashboard/traffic-sources', views.traffic_sources, name='traffic_sources'),
+    path('api/admin/dashboard/system-status', views.system_status, name='system_status'),
+    path('api/admin/dashboard/recent-activities', views.recent_activities, name='recent_activities'),
 
 ]

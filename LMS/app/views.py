@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect
 import requests
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.contrib.auth.hashers import make_password, check_password
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login, logout
@@ -10,7 +10,8 @@ from django.contrib.auth.models import User
 from django.contrib.auth import get_user_model
 from bson import ObjectId
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
+import datetime as dt
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib import messages
 from rest_framework.decorators import api_view
@@ -43,17 +44,22 @@ db = client["test_mongo"]
 teacher_collection = db["auth_teachers"] 
 users_collection = db["auth_user"]
 hr_collection = db_hr["authhr"]
-deleted_hr_collection = db_hr["deleted_hr"]
-deleted_user_collection = db["deleted_auth_user"]
 admin_collection = db["auth_admin"]
 questions_collection = db["questions"] 
-courses_collection = db["Courses"]
 results_collection=db["Results"]
 answers_collection=db["Answers"]
-deleted_question_collection=db["DeletedQuestions"]
 courses_collection = db['courses']
 blog_collection = db['blog']
+deleted_question_collection=db["DeletedQuestions"]
+deleted_courses_collection=db["DeletedCourses"]
 content_types_collection = db['content_types']
+deleted_blogs_collection=db['deleted_blogs']
+deleted_tests_collection=db["deleted_tests"]
+deleted_hr_collection = db_hr["deleted_hr"]
+deleted_user_collection = db["deleted_auth_user"]
+job_collection = db_hr["Joblist"]
+Job_applied_collection = db_hr["JobApplied"]
+Api_Job_collection = db_hr["apijob"]
 
 
 
@@ -63,6 +69,272 @@ content_types_collection = db['content_types']
 
 def index(request):
     return render(request, 'authunticate.html')
+
+def admin_dashboard_stats(request):
+    try:
+        # Count all collections
+        total_users = db.auth_user.count_documents({})
+        total_teachers = db.auth_teachers.count_documents({})
+        total_hr = db_hr.authhr.count_documents({})
+        total_courses = db.courses.count_documents({"is_active": True})
+        total_blogs = db.blog.count_documents({})
+        total_questions = db.questions.count_documents({})
+        
+        # Count new users in last 30 days
+        thirty_days_ago = datetime.now() - timedelta(days=30)
+        new_users = db.auth_user.count_documents({
+            "date_joined": {"$gte": thirty_days_ago}
+        })
+        
+        
+        revenue = 24800 + (new_users * 10)  # Base + $10 per new user
+        
+        return JsonResponse({
+            'total_users': total_users,
+            'total_teachers': total_teachers,
+            'total_hr': total_hr,
+            'total_courses': total_courses,
+            'total_blogs': total_blogs,
+            'total_questions': total_questions,
+            'new_users': new_users,
+            'revenue': revenue,
+            'success': True
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e), 'success': False}, status=500)
+
+def user_growth_data(request):
+    try:
+        # Get user growth for last 6 months
+        data = []
+        months = 6
+        
+        for i in range(months):
+            start_date = datetime.datetime.now() - timedelta(days=30*(months-i))
+            end_date = datetime.datetime.now() - timedelta(days=30*(months-i-1))
+            
+            count = db.auth_user.count_documents({
+                "date_joined": {
+                    "$gte": start_date,
+                    "$lt": end_date
+                }
+            })
+            
+            data.append({
+                'name': start_date.strftime('%b'),
+                'users': count
+            })
+        
+        return JsonResponse({'data': data, 'success': True})
+    except Exception as e:
+        return JsonResponse({'error': str(e), 'success': False}, status=500)
+
+def traffic_sources(request):
+    try:
+        # For demo, we'll simulate traffic sources
+        # In a real app, you'd get this from analytics
+        return JsonResponse({
+            'data': [
+                {'name': 'Web', 'value': 65},
+                {'name': 'Mobile', 'value': 35}
+            ],
+            'success': True
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e), 'success': False}, status=500)
+
+def system_status(request):
+    try:
+        # Simulate system status
+        # In a real app, you'd get this from monitoring tools
+        return JsonResponse({
+            'data': [
+                {'name': 'CPU Usage', 'value': '24%', 'trend': 'down'},
+                {'name': 'Memory', 'value': '3.2/8GB', 'trend': 'stable'},
+                {'name': 'Storage', 'value': '45%', 'trend': 'up'},
+                {'name': 'Uptime', 'value': '99.9%', 'trend': 'stable'}
+            ],
+            'success': True
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e), 'success': False}, status=500)
+# def system_status(request):
+#     try:
+#         # 1. Calculate document counts and estimate storage
+#         user_count = db.auth_user.count_documents({})
+#         teacher_count = db.auth_teachers.count_documents({})
+#         course_count = db.courses.count_documents({})
+#         blog_count = db.blog.count_documents({})
+#         question_count = db.questions.count_documents({})
+        
+#         # 2. Estimate storage usage (adjust these weights based on your actual document sizes)
+#         estimated_sizes = {
+#             'users': user_count * 2,      # KB per user (adjust based on your schema)
+#             'teachers': teacher_count * 3, # KB per teacher
+#             'courses': course_count * 10,  # KB per course (courses are larger)
+#             'blogs': blog_count * 15,      # KB per blog
+#             'questions': question_count * 5 # KB per question
+#         }
+        
+#         total_used_kb = sum(estimated_sizes.values())
+#         total_used_gb = round(total_used_kb / (1024 * 1024), 2)  # Convert to GB
+        
+#         # 3. Get actual storage stats from MongoDB (requires admin privileges)
+#         storage_stats = db.command('dbStats')
+#         storage_used_bytes = storage_stats.get('storageSize', 0)
+#         storage_used_gb = round(storage_used_bytes / (1024 ** 3), 2)
+        
+#         # 4. Calculate percentages (assuming 100GB total storage for example)
+#         total_storage_gb = 100  # Adjust this to your actual storage capacity
+#         storage_percent = min(100, round((storage_used_gb / total_storage_gb) * 100, 2))
+        
+#         # 5. Get memory usage from system
+#         import psutil
+#         memory = psutil.virtual_memory()
+#         memory_used = round(memory.used / (1024 ** 3), 1)
+#         memory_total = round(memory.total / (1024 ** 3), 1)
+#         memory_percent = memory.percent
+        
+#         # 6. CPU usage
+#         cpu_percent = psutil.cpu_percent(interval=1)
+        
+#         # 7. Uptime (server uptime)
+#         uptime_seconds = psutil.boot_time()
+#         uptime_days = round((time.time() - uptime_seconds) / (24 * 3600), 1)
+        
+#         return JsonResponse({
+#             'data': [
+#                 {
+#                     'name': 'CPU Usage',
+#                     'value': f'{cpu_percent}%',
+#                     'trend': 'down' if cpu_percent < 30 else 'up' if cpu_percent > 70 else 'stable'
+#                 },
+#                 {
+#                     'name': 'Memory',
+#                     'value': f'{memory_used}/{memory_total}GB ({memory_percent}%)',
+#                     'trend': 'stable'
+#                 },
+#                 {
+#                     'name': 'Storage',
+#                     'value': f'{storage_percent}% ({storage_used_gb}GB used of {total_storage_gb}GB)',
+#                     'trend': 'up' if storage_percent > 80 else 'stable',
+#                     'breakdown': {
+#                         'users': f'{user_count} users ({estimated_sizes["users"]}KB)',
+#                         'teachers': f'{teacher_count} teachers ({estimated_sizes["teachers"]}KB)',
+#                         'courses': f'{course_count} courses ({estimated_sizes["courses"]}KB)',
+#                         'blogs': f'{blog_count} blogs ({estimated_sizes["blogs"]}KB)',
+#                         'questions': f'{question_count} questions ({estimated_sizes["questions"]}KB)'
+#                     }
+#                 },
+#                 {
+#                     'name': 'Uptime',
+#                     'value': f'{uptime_days} days',
+#                     'trend': 'stable'
+#                 },
+#                 {
+#                     'name': 'Collections Summary',
+#                     'value': '',
+#                     'details': {
+#                         'total_users': user_count,
+#                         'total_teachers': teacher_count,
+#                         'total_courses': course_count,
+#                         'total_blogs': blog_count,
+#                         'total_questions': question_count
+#                     }
+#                 }
+#             ],
+#             'success': True
+#         })
+        
+#     except Exception as e:
+#         return JsonResponse({
+#             'error': str(e),
+#             'success': False
+#         }, status=500)
+
+def recent_activities(request):
+    try:
+        activities = []
+        
+        # 1. Recent user registrations (2 most recent)
+        recent_users = list(db.auth_user.find(
+            {"date_joined": {"$exists": True}}
+        ).sort("date_joined", -1).limit(2))
+        
+        for user in recent_users:
+            activities.append({
+                'action': 'New user registration',
+                'time': user['date_joined'].isoformat(),
+                'user': user.get('username', f"User {user['_id']}"),
+                'type': 'registration',
+                'icon': 'user-plus'
+            })
+        
+        # 2. Recent logins (2 most recent, requires last_login field)
+        recent_logins = list(db.auth_user.find(
+            {"last_login": {"$exists": True}}
+        ).sort("last_login", -1).limit(2))
+        
+        for user in recent_logins:
+            activities.append({
+                'action': 'User login',
+                'time': user['last_login'].isoformat(),
+                'user': user.get('username', f"User {user['_id']}"),
+                'type': 'login',
+                'icon': 'log-in',
+                'ip': user.get('last_login_ip', 'Unknown')  # Add this field in your login handler
+            })
+        
+        # 3. Recent course creations (2 most recent)
+        recent_courses = list(db.courses.find().sort("created_at", -1).limit(2))
+        for course in recent_courses:
+            # Try to get teacher name if available
+            teacher = db.auth_teachers.find_one(
+                {"_id": ObjectId(course['teacher_id'])},
+                {"username": 1}
+            ) if 'teacher_id' in course else None
+            
+            activities.append({
+                'action': 'New course created',
+                'time': course['created_at'].isoformat(),
+                'user': teacher['username'] if teacher else f"Teacher {course['teacher_id']}",
+                'type': 'course',
+                'icon': 'book',
+                'title': course.get('title', 'Untitled Course')
+            })
+        
+        # 4. Recent blog posts (2 most recent)
+        recent_blogs = list(db.blog.find().sort("created_at", -1).limit(2))
+        for blog in recent_blogs:
+            author = db.auth_user.find_one(
+                {"_id": ObjectId(blog['author_id'])},
+                {"username": 1}
+            ) if 'author_id' in blog else None
+            
+            activities.append({
+                'action': 'New blog post',
+                'time': blog['created_at'].isoformat(),
+                'user': author['username'] if author else f"Author {blog.get('author_id', 'Unknown')}",
+                'type': 'blog',
+                'icon': 'edit-3',
+                'title': blog.get('title', 'Untitled Post')
+            })
+        
+        # 5. Add more activity types as needed (question submissions, test results, etc.)
+        
+        # Sort all activities by time (newest first)
+        activities.sort(key=lambda x: x['time'], reverse=True)
+        
+        return JsonResponse({
+            'data': activities[:5],  # Return only the 5 most recent
+            'success': True
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e),
+            'success': False
+        }, status=500)
 
 @api_view(['POST'])
 def create_blog(request):
@@ -1074,8 +1346,293 @@ def save_course_content(request, course_id):
 
 
 
+@api_view(['PUT'])
+def update_course_status(request, course_id):
+    """
+    Toggle the active status of a course (activate/deactivate)
+    """
+    try:
+        if not ObjectId.is_valid(course_id):
+            return Response(
+                {"error": "Invalid course ID"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
+        # Get current status to toggle
+        course = courses_collection.find_one({"_id": ObjectId(course_id)})
+        if not course:
+            return Response(
+                {"error": "Course not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
 
+        new_status = not course.get('is_active', True)
+
+        # Update only the is_active field
+        result = courses_collection.update_one(
+            {'_id': ObjectId(course_id)},
+            {
+                '$set': {
+                    'is_active': new_status,
+                    'updated_at': datetime.datetime.now()
+                }
+            }
+        )
+
+        if result.modified_count == 0:
+            return Response(
+                {"error": "No changes made"}, 
+                status=status.HTTP_304_NOT_MODIFIED
+            )
+
+        return Response(
+            {"message": f"Course {'activated' if new_status else 'deactivated'} successfully"},
+            status=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+        return Response(
+            {"error": str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+@api_view(['DELETE'])
+def delete_course(request, course_id):
+    """
+    Soft delete course by moving to deleted_courses collection
+    """
+    try:
+        if not ObjectId.is_valid(course_id):
+            return Response(
+                {"error": "Invalid course ID"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get course data before deletion
+        course = courses_collection.find_one({"_id": ObjectId(course_id)})
+        if not course:
+            return Response(
+                {"error": "Course not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Prepare deleted course document
+        deleted_course = {
+            "original_data": course,  # Store entire course document
+            "deleted_at": datetime.datetime.utcnow(),
+            "deleted_by": request.user.id if hasattr(request, 'user') else None,
+            "reason": request.data.get('reason', 'No reason provided')
+        }
+
+        # Insert into deleted collection
+        deleted_courses_collection.insert_one(deleted_course)
+
+        # Delete from main collection
+        courses_collection.delete_one({"_id": ObjectId(course_id)})
+
+        return Response(
+            {"message": "Course moved to archive"},
+            status=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+        return Response(
+            {"error": str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+        
+        
+@api_view(['PUT'])
+def update_blog_status(request, blog_id):
+    """
+    Toggle the active status of a blog (activate/deactivate)
+    """
+    try:
+        if not ObjectId.is_valid(blog_id):
+            return Response(
+                {"error": "Invalid blog ID"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get current status to toggle
+        blog = blog_collection.find_one({"_id": ObjectId(blog_id)})
+        if not blog:
+            return Response(
+                {"error": "Blog not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        new_status = not blog.get('is_active', True)
+
+        # Update only the is_active field
+        result = blog_collection.update_one(
+            {'_id': ObjectId(blog_id)},
+            {
+                '$set': {
+                    'is_active': new_status,
+                    'updated_at': datetime.datetime.now()
+                }
+            }
+        )
+
+        if result.modified_count == 0:
+            return Response(
+                {"error": "No changes made"}, 
+                status=status.HTTP_304_NOT_MODIFIED
+            )
+
+        return Response(
+            {"message": f"Blog {'activated' if new_status else 'deactivated'} successfully"},
+            status=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+        return Response(
+            {"error": str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['DELETE'])
+def delete_blog(request, blog_id):
+    """
+    Soft delete blog by moving to deleted_blogs collection
+    """
+    try:
+        if not ObjectId.is_valid(blog_id):
+            return Response(
+                {"error": "Invalid blog ID"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get blog data before deletion
+        blog = blog_collection.find_one({"_id": ObjectId(blog_id)})
+        if not blog:
+            return Response(
+                {"error": "Blog not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Prepare deleted blog document
+        deleted_blog = {
+            "original_data": blog,  # Store entire blog document
+            "deleted_at": datetime.datetime.utcnow(),
+            "deleted_by": request.user.id if hasattr(request, 'user') else None,
+            "reason": request.data.get('reason', 'No reason provided')
+        }
+
+        # Insert into deleted collection
+        deleted_blogs_collection.insert_one(deleted_blog)
+
+        # Delete from main collection
+        blog_collection.delete_one({"_id": ObjectId(blog_id)})
+
+        return Response(
+            {"message": "Blog moved to archive"},
+            status=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+        return Response(
+            {"error": str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+@api_view(['PUT'])
+def update_test_status(request, test_id):
+    """
+    Toggle the active status of a test (activate/deactivate)
+    """
+    try:
+        if not ObjectId.is_valid(test_id):
+            return Response(
+                {"error": "Invalid test ID"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get current status to toggle
+        test =  questions_collection.find_one({"_id": ObjectId(test_id)})
+        if not test:
+            return Response(
+                {"error": "Test not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        new_status = not test.get('is_active', True)
+
+        # Update only the is_active field
+        result =  questions_collection.update_one(
+            {'_id': ObjectId(test_id)},
+            {
+                '$set': {
+                    'is_active': new_status,
+                    'updated_at': datetime.datetime.now()
+                }
+            }
+        )
+
+        if result.modified_count == 0:
+            return Response(
+                {"error": "No changes made"}, 
+                status=status.HTTP_304_NOT_MODIFIED
+            )
+
+        return Response(
+            {
+                "message": f"Test {'activated' if new_status else 'deactivated'} successfully",
+                "is_active": new_status
+            },
+            status=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+        return Response(
+            {"error": str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['DELETE'])
+def delete_test(request, test_id):
+    """
+    Soft delete test by moving to deleted_tests collection
+    """
+    try:
+        if not ObjectId.is_valid(test_id):
+            return Response(
+                {"error": "Invalid test ID"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get test data before deletion
+        test =  questions_collection.find_one({"_id": ObjectId(test_id)})
+        if not test:
+            return Response(
+                {"error": "Test not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Prepare deleted test document
+        deleted_test = {
+            "original_data": test,  # Store entire test document
+            "deleted_at": datetime.datetime.utcnow(),
+            "deleted_by": request.user.id if hasattr(request, 'user') else None,
+            "reason": request.data.get('reason', 'No reason provided'),
+            "test_type": test.get('type', 'assessment')  # Store test type for reference
+        }
+
+        # Insert into deleted collection
+        deleted_question_collection.insert_one(deleted_test)
+
+        # Delete from main collection
+        questions_collection.delete_one({"_id": ObjectId(test_id)})
+
+        return Response(
+            {"message": "Test moved to archive"},
+            status=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+        return Response(
+            {"error": str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 @api_view(['POST'])
 
@@ -1132,38 +1689,52 @@ def assessment_details(request, assessment_id):
             status=status.HTTP_400_BAD_REQUEST
         )
         
-@api_view(["POST"])  
+from bson import ObjectId
+
+@api_view(["POST"])
 def test(request):
     try:
-        student_id = request.data.get('student_id')
         
-        # Get all assigned assessments
         assessments = list(questions_collection.find({"is_assigned": True}).sort("timestamp", -1))
         
-        # Filter out completed assessments if student_id provided
-        if student_id:
-            completed_ids = {
-                str(sub['test_id']) for sub in 
-                answers_collection.find({"student_id": ObjectId(student_id)})
-            }
-            assessments = [
-                assessment for assessment in assessments
-                if str(assessment['_id']) not in completed_ids
-            ]
+        # Get unique teacher IDs to avoid duplicate queries
+        unique_teacher_ids = list({ObjectId(assessment['teacher_id']) for assessment in assessments})
+       
         
-        # Convert ObjectId to string (maintaining original response format)
+        # Fetch teacher names for all unique teachers
+        teachers = list(teacher_collection.find(
+            {"_id": {"$in": unique_teacher_ids}},
+            {"first_name": 1, "last_name": 1},  
+        ))
+       
+        
+        # Create mapping with fallback for missing names
+        teacher_name_map = {}
+        for teacher in teachers:
+            teacher_id = str(teacher['_id'])
+            fname = teacher.get('first_name')  or 'Unknown Teacher'
+            lname= teacher.get('last_name', '')
+            name= f"{fname} {lname}".strip()
+            teacher_name_map[teacher_id] = name
+        
+        # Prepare response data
+        response_data = []
         for assessment in assessments:
-            assessment['_id'] = str(assessment['_id'])
+            assessment_data = {
+                **assessment,
+                '_id': str(assessment['_id']),
+                'teacher_name': teacher_name_map.get(assessment['teacher_id'], 'Unknown Teacher')
+            }
+            response_data.append(assessment_data)
         
-        return Response(assessments, status=status.HTTP_200_OK)
+        return Response(response_data, status=status.HTTP_200_OK)
         
     except Exception as e:
+        print("Error:", str(e))  # Add detailed error logging
         return Response(
             {'error': f'Failed to retrieve assessments: {str(e)}'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
-
 # views.py
 @api_view(["POST"])
 def completed_tests(request):
@@ -1542,6 +2113,8 @@ def calculate_score(test, answers):
         'ai_evaluated_questions': ai_evaluated_questions
     }
 
+from datetime import datetime, timedelta
+
 
 @api_view(['POST'])
 def login_react(request):
@@ -1558,8 +2131,12 @@ def login_react(request):
         role= mongo_user.get("role", "student")
         
        
-        
+        current_time = datetime.now()
 
+        users_collection.update_one(
+            {"_id": mongo_user["_id"]},
+            {"$set": {"last_login": current_time}}
+        )
        
 
         # Generate JWT Token
@@ -1569,7 +2146,8 @@ def login_react(request):
             "id": str(mongo_user["_id"]),
             "username": mongo_user["username"],
             "role": role,
-            "exp": datetime.datetime.utcnow() + datetime.timedelta(days=1),  
+            "exp": datetime.now() + timedelta(days=1)
+
         }
         access_token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
 
@@ -1610,7 +2188,8 @@ def login_react_admin(request):
             "id": str(mongo_user["_id"]),
             "username": mongo_user["username"],
             "role": role,
-            "exp": datetime.datetime.now() + datetime.timedelta(days=1),  
+        "exp": datetime.now() + timedelta(days=1)
+
         }
         access_token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
 
@@ -1697,7 +2276,7 @@ def signup_react(request):
         "is_active": True,
         "is_staff": False,
         "is_superuser": False,
-        "date_joined": datetime.datetime.now(),
+        "date_joined": datetime.now(),
     }
     user_data["_id"] = ObjectId()
     user_data["id"] = int(str(user_data["_id"])[:8], 16)
@@ -2141,3 +2720,883 @@ def dashbord(request):
     return render(request, "teacher.html" if is_teacher else "dashbord.html", {"is_teacher": is_teacher})
 
 
+
+from bson import ObjectId
+import json
+from datetime import datetime
+from django.conf import settings
+import jwt
+from django.contrib.auth.hashers import make_password, check_password
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+
+# views.py
+from django.http import JsonResponse
+
+@api_view(['GET'])
+def get_user_profile(request):
+    print("All headers:", request.headers)
+    print("Auth header:", request.META.get('HTTP_AUTHORIZATION', request.headers.get('Authorization', '')))
+    
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '') or request.headers.get('Authorization', '')
+    if not auth_header:
+        print("No auth header received")
+        return Response(
+            {'success': False, 'error': 'Authorization header is missing'},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+    try:
+        print("Incoming headers:", request.headers)  # Debug all headers
+        print("Auth header:", request.META.get('HTTP_AUTHORIZATION'))
+        
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        if not auth_header:
+            return Response(
+                {'success': False, 'error': 'Authorization header is missing'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        # Extract token
+        token = auth_header.split(' ')[-1] if ' ' in auth_header else auth_header
+        
+        try:
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+            user_id = payload['id']
+            user = users_collection.find_one({"_id": ObjectId(user_id)})
+            print("Complete user document:", user)  # Add this line
+            print("Passout Year:", user.get("Passout_Year", "Not available"))
+            print("Graduation Percentage:", user.get("Graduation_Percentage", "Not available"))
+
+
+            if not user:
+                return Response(
+                    {'success': False, 'error': 'User not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+                
+            return Response({
+                'success': True,
+                'data': {
+                    'id': str(user['_id']),
+                    'username': user.get('username'),
+                    'email': user.get('email'),
+                    'first_name': user.get('first_name', ''),
+                    'last_name': user.get('last_name', ''),
+                    'mobile': user.get('mobile', ''),
+                    'location': user.get('location', ''),
+                    'skills': user.get('skills', []),
+                    'experiences': user.get('experiences', []),
+                    'resume': user.get('resume'),
+                    'profile_picture': user.get('profile_picture', ''),
+                    'projects': user.get('projects', {}),
+                    '10th_board': user.get('10th_board', ''),
+                    '10th_Percentage': user.get('10th_Percentage', ''),
+                    '10th_school': user.get('10th_school', ''),
+                    '10th_passout_year': user.get('10th_passout_year', ''),
+                    '12th_board': user.get('12th_board', ''),
+                    '12th_Percentage': user.get('12th_Percentage', ''),
+                    '12th_school': user.get('12th_school', ''),
+                    '12th_passout_year': user.get('12th_passout_year', ''),
+                     "Passout_Year": user.get("Passout_Year", ""),
+                    "branch": user.get("branch", ""),
+                    "ug_college": user.get("ug_college", ""),
+                    "Graduation_Percentage": user.get('Graduation_Percentage', ''),
+                }
+            })
+          
+            
+        except jwt.ExpiredSignatureError:
+            return Response(
+                {'success': False, 'error': 'Token expired'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        except jwt.InvalidTokenError:
+            return Response(
+                {'success': False, 'error': 'Invalid token'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        except Exception as e:
+            return Response(
+                {'success': False, 'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+    except Exception as e:
+        return Response(
+            {'success': False, 'error': 'Server error: ' + str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+        
+@api_view(['PUT'])
+def update_user_profile(request):
+    try:
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '') or request.headers.get('Authorization', '')
+        if not auth_header:
+            return Response(
+                {'success': False, 'error': 'Authorization header is missing'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        token = auth_header.split(' ')[-1] if ' ' in auth_header else auth_header
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        user_id = payload['id']
+        
+        user = users_collection.find_one({"_id": ObjectId(user_id)})
+        if not user:
+            return Response(
+                {'success': False, 'error': 'User not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        data = request.data
+        update_data = {}
+
+        # Basic profile fields
+        basic_fields = [
+            'first_name', 'last_name', 'mobile', 'location', 
+            'title', 'experience', 'profile_picture'
+        ]
+        for field in basic_fields:
+            if field in data:
+                update_data[field] = data[field]
+
+        # Skills - handle array
+        if 'skills' in data and isinstance(data['skills'], list):
+            update_data['skills'] = data['skills']
+
+        # Projects - handle array of objects
+        if 'projects' in data and isinstance(data['projects'], list):
+            update_data['projects'] = []
+            for project in data['projects']:
+                # Validate and clean project data
+                clean_project = {
+                    'title': project.get('title', ''),
+                    'description': project.get('description', ''),
+                    'link': project.get('link', ''),
+                    'start_date': project.get('start_date', ''),
+                    'end_date': project.get('end_date', ''),
+                    'currently_ongoing': project.get('currently_ongoing', False)
+                }
+                update_data['projects'].append(clean_project)
+
+        # Work Experience - handle array of objects
+        if 'experiences' in data and isinstance(data['experiences'], list):
+            update_data['experiences'] = []
+            for exp in data['experiences']:
+                # Validate and clean experience data
+                clean_exp = {
+                    'company_name': exp.get('company_name', ''),
+                    'job_title': exp.get('job_title', ''),
+                    'start_date': exp.get('start_date', ''),
+                    'end_date': exp.get('end_date', ''),
+                    'currently_working': exp.get('currently_working', False),
+                    'description': exp.get('description', '')
+                }
+                update_data['experiences'].append(clean_exp)
+
+        # Education fields
+        education_mapping = {
+            '10th_board': '10th_board',
+            '10th_school': '10th_school',
+            '10th_Percentage': '10th_Percentage',
+            '10th_passout_year': '10th_passout_year',
+            '12th_board': '12th_board',
+            '12th_school': '12th_school',
+            '12th_Percentage': '12th_Percentage',
+            '12th_passout_year': '12th_passout_year',
+            'ug_college': 'ug_college',
+            'branch': 'branch',
+            'Graduation_Percentage': 'Graduation_Percentage',
+            'Passout_Year': 'Passout_Year'
+        }
+
+        for field, db_field in education_mapping.items():
+            if field in data:
+                update_data[db_field] = data[field]
+
+        # Perform the update
+        result = users_collection.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": update_data}
+        )
+
+        if result.modified_count > 0:
+            return Response({
+                'success': True,
+                'message': 'Profile updated successfully'
+            })
+        else:
+            return Response({
+                'success': False,
+                'message': 'No changes were made to the profile'
+            })
+
+    except jwt.ExpiredSignatureError:
+        return Response(
+            {'success': False, 'error': 'Token expired'},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+    except jwt.InvalidTokenError:
+        return Response(
+            {'success': False, 'error': 'Invalid token'},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+    except Exception as e:
+        return Response(
+            {'success': False, 'error': str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+import base64
+from bson import ObjectId
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+import jwt
+from django.conf import settings
+
+@api_view(['POST'])
+def upload_profile_picture(request):
+    try:
+        # Authentication check
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '') or request.headers.get('Authorization', '')
+        if not auth_header:
+            return Response(
+                {'success': False, 'error': 'Authorization header is missing'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        token = auth_header.split(' ')[-1] if ' ' in auth_header else auth_header
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        user_id = payload['id']
+        
+        # Check if file was uploaded
+        if 'profile_picture' not in request.FILES:
+            return Response(
+                {'success': False, 'error': 'No file uploaded'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        profile_picture = request.FILES['profile_picture']
+        
+        # Read the file and convert to Base64
+        image_data = profile_picture.read()
+        base64_encoded = base64.b64encode(image_data).decode('utf-8')
+        
+        # Determine content type
+        content_type = profile_picture.content_type
+        
+        # Create the data structure to store
+        picture_data = {
+            'content_type': content_type,
+            'data': base64_encoded
+        }
+        
+        # Update user's profile picture in database
+        users_collection.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": {"profile_picture": picture_data}}
+        )
+        
+        return Response({
+            'success': True,
+            'profile_picture': picture_data
+        })
+        
+    except Exception as e:
+        return Response(
+            {'success': False, 'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )     
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+import jwt
+from django.conf import settings
+from bson import ObjectId
+
+@api_view(['PUT'])
+def update_profile_skills(request):
+    try:
+        # 1. Authentication
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '') or request.headers.get('Authorization', '')
+        if not auth_header:
+            return Response(
+                {'success': False, 'error': 'Authorization header missing'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        # 2. Validate token
+        token = auth_header.split(' ')[-1] if ' ' in auth_header else auth_header
+        try:
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+            user_id = payload['id']
+        except jwt.ExpiredSignatureError:
+            return Response(
+                {'success': False, 'error': 'Token expired'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        except jwt.InvalidTokenError:
+            return Response(
+                {'success': False, 'error': 'Invalid token'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        # 3. Validate request data
+        if not request.data:
+            return Response(
+                {'success': False, 'error': 'Request body is empty'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if 'skills' not in request.data:
+            return Response(
+                {'success': False, 'error': 'Skills field is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not isinstance(request.data['skills'], list):
+            return Response(
+                {
+                    'success': False,
+                    'error': 'Skills must be an array',
+                    'received_type': str(type(request.data['skills']))
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 4. Validate each skill
+        invalid_skills = [s for s in request.data['skills'] if not isinstance(s, str)]
+        if invalid_skills:
+            return Response(
+                {
+                    'success': False,
+                    'error': 'All skills must be strings',
+                    'invalid_skills': invalid_skills
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 5. Update database
+        result = users_collection.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": {"skills": request.data['skills']}}
+        )
+
+        return Response({
+            'success': True,
+            'message': 'Skills updated successfully',
+            'skills': request.data['skills']
+        })
+
+    except Exception as e:
+        return Response(
+            {
+                'success': False,
+                'error': 'Server error',
+                'details': str(e)
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+
+from django.http import JsonResponse
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+import jwt
+from django.conf import settings
+import base64
+from datetime import datetime
+from bson.objectid import ObjectId
+
+@api_view(['POST'])
+def upload_resume(request):
+    try:
+        # Authentication check
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '') or request.headers.get('Authorization', '')
+        if not auth_header:
+            return Response(
+                {'success': False, 'error': 'Authorization header is missing'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        token = auth_header.split(' ')[-1] if ' ' in auth_header else auth_header
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        user_id = payload['id']
+        
+        # Check if file was uploaded
+        if 'resume' not in request.FILES:
+            return Response(
+                {'success': False, 'error': 'No file uploaded'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        resume_file = request.FILES['resume']
+        
+        # Validate file type (PDF or DOC/DOCX)
+        allowed_types = ['application/pdf', 'application/msword', 
+                        'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+        if resume_file.content_type not in allowed_types:
+            return Response(
+                {'success': False, 'error': 'Only PDF, DOC, and DOCX files are allowed'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Limit file size (5MB)
+        if resume_file.size > 5 * 1024 * 1024:
+            return Response(
+                {'success': False, 'error': 'File size exceeds 5MB limit'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Read the file and convert to Base64
+        file_data = resume_file.read()
+        base64_encoded = base64.b64encode(file_data).decode('utf-8')
+        
+        # Create the data structure to store
+        resume_data = {
+            'filename': resume_file.name,
+            'content_type': resume_file.content_type,
+            'data': base64_encoded,
+            'uploaded_at': datetime.now().isoformat()  
+        }
+        
+        # Update user's resume in database
+        users_collection.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": {"resume": resume_data}}
+        )
+        
+        response = Response({
+            'success': True,
+            'message': 'Resume uploaded successfully',
+            'filename': resume_file.name
+        })
+        
+        # Add CORS headers
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        
+        return response
+        
+    except jwt.ExpiredSignatureError:
+        return Response(
+            {'success': False, 'error': 'Token expired'},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+    except jwt.InvalidTokenError:
+        return Response(
+            {'success': False, 'error': 'Invalid token'},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+    except Exception as e:
+        return Response(
+            {'success': False, 'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+# views.py
+# views.py
+from django.http import HttpResponse, JsonResponse
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+import base64
+import jwt
+from django.conf import settings
+from bson.objectid import ObjectId
+import logging
+
+logger = logging.getLogger(__name__)
+
+@api_view(['GET'])
+def download_resume(request):
+    try:
+        # 1. Authentication
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        if not auth_header:
+            logger.error('No authorization header')
+            return JsonResponse(
+                {'error': 'Authorization header missing'}, 
+                status=401
+            )
+            
+        # Extract token
+        token = auth_header.split(' ')[-1] if ' ' in auth_header else auth_header
+        
+        try:
+            # Verify token
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+            user_id = payload['id']
+        except jwt.ExpiredSignatureError:
+            return JsonResponse({'error': 'Token expired'}, status=401)
+        except jwt.InvalidTokenError:
+            return JsonResponse({'error': 'Invalid token'}, status=401)
+        
+        # 2. Get user from database
+        user = users_collection.find_one({"_id": ObjectId(user_id)})
+        if not user:
+            logger.error(f'User not found for ID: {user_id}')
+            return JsonResponse({'error': 'User not found'}, status=404)
+        
+        # 3. Check if resume exists
+        if 'resume' not in user or not user['resume']:
+            logger.error('No resume found for user')
+            return JsonResponse({'error': 'Resume not found'}, status=404)
+        
+        resume_data = user['resume']
+        
+        # 4. Validate resume data structure
+        required_fields = ['data', 'content_type', 'filename']
+        if not all(field in resume_data for field in required_fields):
+            logger.error('Invalid resume data structure')
+            return JsonResponse(
+                {'error': 'Invalid resume data format'}, 
+                status=500
+            )
+        
+        # 5. Decode and send file
+        try:
+            file_data = base64.b64decode(resume_data['data'])
+            response = HttpResponse(
+                file_data,
+                content_type=resume_data['content_type']
+            )
+            response['Content-Disposition'] = (
+                f'attachment; filename="{resume_data["filename"]}"'
+            )
+            return response
+        except Exception as e:
+            logger.error(f'File decoding error: {str(e)}')
+            return JsonResponse(
+                {'error': 'Failed to process resume file'}, 
+                status=500
+            )
+            
+    except Exception as e:
+        logger.error(f'Unexpected error: {str(e)}')
+        return JsonResponse(
+            {'error': 'Internal server error'}, 
+            status=500
+        )
+
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+import jwt
+from django.conf import settings
+from bson import ObjectId
+
+
+@api_view(['DELETE'])
+def delete_resume(request):
+    try:
+        # Get the Authorization header
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '') or request.headers.get('Authorization', '')
+        if not auth_header:
+            return Response(
+                {'error': 'Authorization header is missing'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        # Extract the token from header
+        token = auth_header.split(' ')[-1] if ' ' in auth_header else auth_header
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        user_id = payload['id']
+
+        # Find the user in MongoDB
+        user = users_collection.find_one({"_id": ObjectId(user_id)})
+        if not user:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Delete the resume (set it to None)
+        users_collection.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": {"resume": None}}
+        )
+
+        return Response({'success': True})
+
+    except jwt.ExpiredSignatureError:
+        return Response({'error': 'Token expired'}, status=status.HTTP_401_UNAUTHORIZED)
+    except jwt.InvalidTokenError:
+        return Response({'error': 'Invalid token'}, status=status.HTTP_401_UNAUTHORIZED)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+def get_all_jobs(request):
+    try:
+        jobs = list(job_collection.find().sort("postedDate", -1))
+        
+        for job in jobs:
+            job['_id'] = str(job['_id'])
+            job['days_ago'] = calculate_days_ago(job.get('postedDate'))
+            
+            # Properly format education field
+            if 'education' in job:
+                if isinstance(job['education'], list):
+                    job['education'] = ', '.join([str(item) for item in job['education']])
+                elif isinstance(job['education'], str) and job['education'].startswith('['):
+                    # Handle case where it's a string representation of a list
+                    try:
+                        parsed = eval(job['education'])  # Note: eval can be dangerous with untrusted data
+                        job['education'] = ', '.join([str(item) for item in parsed])
+                    except:
+                        pass
+            
+            # Properly format location field
+            if 'Location' in job:
+                if isinstance(job['Location'], list):
+                    job['Location'] = ', '.join([str(item) for item in job['Location']])
+                elif isinstance(job['Location'], str) and job['Location'].startswith('['):
+                    try:
+                        parsed = eval(job['Location'])
+                        job['Location'] = ', '.join([str(item) for item in parsed])
+                    except:
+                        pass
+            
+        return Response(jobs, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+def calculate_days_ago(posted_date):
+    """Helper function to calculate days since posting"""
+    if not posted_date:
+        return "Recently"
+    
+    today = datetime.datetime.now()
+    posted = datetime.datetime.strptime(posted_date, '%Y-%m-%d')
+    diff = today - posted
+    
+    if diff.days == 0:
+        return "Today"
+    elif diff.days == 1:
+        return "Yesterday"
+    else:
+        return f"{diff.days} days ago"
+@api_view(['GET'])
+def search_jobs(request):
+    try:
+        search_query = request.query_params.get('q', '').lower()
+        
+        if not search_query:
+            return get_all_jobs(request)
+            
+        # Create a case-insensitive regex pattern
+        regex_pattern = f".*{search_query}.*"
+        
+        jobs = list(job_collection.find({
+            "$or": [
+                {"title": {"$regex": regex_pattern, "$options": "i"}},
+                {"company": {"$regex": regex_pattern, "$options": "i"}},
+                {"location": {"$regex": regex_pattern, "$options": "i"}},
+                {"description": {"$regex": regex_pattern, "$options": "i"}}
+            ]
+        }).sort("postedDate", -1))
+        
+        # Convert ObjectId to string and format dates
+        for job in jobs:
+            job['_id'] = str(job['_id'])
+            job['days_ago'] = calculate_days_ago(job.get('postedDate'))
+            
+        return Response(jobs, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+# views.py
+# views.py
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+import jwt
+from django.conf import settings
+from bson import ObjectId
+from datetime import datetime
+
+@api_view(['POST'])
+def apply_job(request):
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '') or request.headers.get('Authorization', '')
+    if not auth_header:
+        return Response({'error': 'Authorization header missing'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        token = auth_header.split(' ')[-1] if ' ' in auth_header else auth_header
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        user_id = payload['id']
+        
+        job_id = request.data.get('job_id')
+        hr_id = request.data.get('hr_id')
+        
+        if not job_id or not hr_id:
+            return Response({'error': 'Missing job_id or hr_id'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        existing_application = Job_applied_collection.find_one({
+            'user_id': str(user_id),
+            'job_id': job_id
+        })
+        
+        if existing_application:
+            return Response({'error': 'Already applied to this job'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        application = {
+            'user_id': str(user_id),
+            'job_id': job_id,
+            'hr_id': hr_id,
+            'applied_at': datetime.utcnow()
+        }
+        
+        Job_applied_collection.insert_one(application)
+        
+        return Response({'message': 'Application submitted successfully'}, status=status.HTTP_201_CREATED)
+
+    except jwt.ExpiredSignatureError:
+        return Response({'error': 'Token expired'}, status=status.HTTP_401_UNAUTHORIZED)
+    except jwt.InvalidTokenError:
+        return Response({'error': 'Invalid token'}, status=status.HTTP_401_UNAUTHORIZED)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+@api_view(['GET'])
+
+def check_applied(request):
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '') or request.headers.get('Authorization', '')
+    
+    try:
+        token = auth_header.split(' ')[-1] if ' ' in auth_header else auth_header
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        user_id = payload['id']
+        job_id = request.query_params.get('job_id')
+        
+        if not job_id:
+            return Response({'error': 'Missing job_id'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if application exists
+        application = Job_applied_collection.find_one({
+            'user_id': str(user_id),
+            'job_id': job_id
+        })
+        
+        return Response({'applied': application is not None}, status=status.HTTP_200_OK)
+    
+    except Exception as e:
+        print("Error in check_applied:", str(e))
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+import requests
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+from datetime import datetime, timedelta
+import os
+# from dotenv import load_dotenv
+
+# load_dotenv()
+
+# MongoDB connection setup would be here
+# ...
+
+@api_view(['GET'])
+def fetch_and_store_jobs(request):
+    """
+    Fetch jobs from JSearch API and store in MongoDB
+    """
+    try:
+        # First, delete all existing jobs
+        Api_Job_collection.delete_many({})
+        
+        # JSearch API parameters
+        url = "https://jsearch.p.rapidapi.com/search"
+        querystring = {
+            "query": "Software Engineer",  # Default query, can be parameterized
+            "page": "1",
+            "num_pages": "3",  # Get more pages for more results
+            "date_posted": "today",  # Get only today's jobs
+            "employment_types": "FULLTIME",
+        }
+        
+        headers = {
+            "X-RapidAPI-Key": os.getenv('44491fd700msh827d20b1bd779b9p192e4cjsne0003142b454'),
+            "X-RapidAPI-Host": os.getenv('jsearch.p.rapidapi.com')
+        }
+        
+        response = requests.get(url, headers=headers, params=querystring)
+        response.raise_for_status()
+        data = response.json()
+        
+        if data.get('status') != 'OK':
+            return Response({'error': 'JSearch API returned non-OK status'}, 
+                          status=status.HTTP_502_BAD_GATEWAY)
+        
+        jobs_data = data.get('data', [])
+        current_time = datetime.now()
+        
+        # Process and store jobs
+        processed_jobs = []
+        for job in jobs_data:
+            processed_job = {
+                'job_id': job.get('job_id'),
+                'employer_name': job.get('employer_name'),
+                'job_title': job.get('job_title'),
+                'job_country': job.get('job_country'),
+                'job_state': job.get('job_state'),
+                'job_city': job.get('job_city'),
+                'job_description': job.get('job_description'),
+                'job_employment_type': job.get('job_employment_type'),
+                'job_min_salary': job.get('job_min_salary'),
+                'job_max_salary': job.get('job_max_salary'),
+                'job_salary_period': job.get('job_salary_period'),
+                'job_salary_currency': job.get('job_salary_currency'),
+                'job_posted_at_timestamp': job.get('job_posted_at_timestamp'),
+                'job_apply_link': job.get('job_apply_link'),
+                'employer_logo': job.get('employer_logo'),
+                'job_is_remote': job.get('job_is_remote'),
+                'fetched_at': current_time,
+                'expires_at': current_time + timedelta(days=1),  # 24 hour expiration
+                'source': 'jsearch'
+            }
+            processed_jobs.append(processed_job)
+        
+        if processed_jobs:
+            Api_Job_collection.insert_many(processed_jobs)
+        
+        return Response({
+            'message': f'Successfully stored {len(processed_jobs)} jobs',
+            'jobs_processed': len(processed_jobs)
+        }, status=status.HTTP_200_OK)
+    
+    except requests.exceptions.RequestException as e:
+        return Response({
+            'error': 'JSearch API request failed',
+            'details': str(e)
+        }, status=status.HTTP_502_BAD_GATEWAY)
+    except Exception as e:
+        return Response({
+            'error': 'Internal server error',
+            'details': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+def get_all_jobs1(request):
+    try:
+        # Test connection first
+        print("Collections in database:", Api_Job_collection.database.list_collection_names())
+        
+        # Count documents
+        count = Api_Job_collection.count_documents({})
+        print(f"Found {count} documents in collection")
+        
+        jobs = list(Api_Job_collection.find({}))
+        print("First 3 jobs:", jobs[:3])  # Print sample if exists
+        
+        for job in jobs:
+            job['_id'] = str(job['_id'])
+            
+        return Response(jobs, status=status.HTTP_200_OK)
+    except Exception as e:
+        print("Error:", str(e))
+        return Response({'error': str(e)}, status=500)
