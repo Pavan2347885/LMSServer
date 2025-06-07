@@ -17,7 +17,8 @@ urlpatterns = [
     path('teacher/', views.teacherpage, name='teacherpage'),
     
     path('check-auth/', views.check_auth, name='check_auth'),
-    
+    # In urls.py
+    path('api/get_course/<str:course_id>', views.get_course, name='get_course'),
      path('teacher/google/login/', views.teacher_google_login, name='teacher_google_login'),
      path('teacher/github/login/', views.teacher_github_login, name='teacher_github_login'),
      path('assessment/', views.assessment, name='assessment'),
@@ -42,12 +43,14 @@ urlpatterns = [
     path('api/get_teacher_courses/<str:teacher_id>/', views.get_teacher_courses ),
     path('api/get_teacher_blogs/<str:author_id>/', views.get_teacher_blogs ),
     path('api/get_courses/', views.get_courses ),
+    path('api/get_all_reviews/', views.get_all_reviews ),
     path('api/get_blogs/', views.get_blogs ),
     path('api/add_student/', views.add_student ),
     path('api/students', views.get_all_students, name='get_all_students'),
     path('api/updated_student/<str:student_id>', views.update_student, name='update_student'),
     path('api/deleted_student/<str:student_id>', views.archive_student, name='archive_student'),
     path('api/teachers', views.get_all_teachers),
+    
     path('api/add_teacher/', views.add_teacher),
     path('api/updated_teacher/<str:teacher_id>', views.update_teacher),
     path('api/deleted_teacher/<str:teacher_id>', views.archive_teacher),

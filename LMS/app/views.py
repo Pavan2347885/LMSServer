@@ -60,7 +60,7 @@ deleted_user_collection = db["deleted_auth_user"]
 job_collection = db_hr["Joblist"]
 Job_applied_collection = db_hr["JobApplied"]
 Api_Job_collection = db_hr["apijob"]
-
+reviews= db["review"]
 
 
 
@@ -352,8 +352,8 @@ def create_blog(request):
         # Create blog document
         blog_doc = {
             'title': blog_data['title'],
-            'created_at': datetime.datetime.now(),
-            'updated_at': datetime.datetime.now(),
+            'created_at': datetime.now(),
+            'updated_at': datetime.now(),
             'author_id': blog_data.get('teacher_id'),  # Using teacher_id as author_id
             'blog_data_json': blog_json,
             'description': blog_data.get('description', ''),
@@ -379,6 +379,49 @@ def create_blog(request):
             {'error': f'Failed to create blog: {str(e)}'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+# @api_view(['POST'])
+# def create_blog(request):
+#     try:
+#         blog_data = request.data
+        
+        
+#         # Validate required fields
+#         if not blog_data.get('title'):
+#             return Response({'error': 'Blog title is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+#         # Convert the blog data to JSON string for storage
+#         blog_json = json.dumps(blog_data)
+        
+#         # Create blog document
+#         blog_doc = {
+#             'title': blog_data['title'],
+#             'created_at': datetime.datetime.now(),
+#             'updated_at': datetime.datetime.now(),
+#             'author_id': blog_data.get('teacher_id'),  # Using teacher_id as author_id
+#             'blog_data_json': blog_json,
+#             'description': blog_data.get('description', ''),
+#             'tags': blog_data.get('tags', []),
+#             'is_published': blog_data.get('is_published', False),
+#             'featured_image': blog_data.get('featured_image', ''),
+#             'category': blog_data.get('category', 'General')
+#         }
+        
+#         # Insert into MongoDB
+#         result = blog_collection.insert_one(blog_doc)
+#         blog_id = str(result.inserted_id)
+        
+#         return Response({
+#             'message': 'Blog created successfully',
+#             'blog_id': blog_id
+#         }, status=status.HTTP_201_CREATED)
+        
+#     except Exception as e:
+#         import traceback
+#         print("Error:", traceback.format_exc())  # Detailed error logging
+#         return Response(
+#             {'error': f'Failed to create blog: {str(e)}'}, 
+#             status=status.HTTP_500_INTERNAL_SERVER_ERROR
+#         )
 
 @api_view(['GET'])
 def get_test_by_id1(request, id):
@@ -488,6 +531,17 @@ def get_all_hrs(request):
         return Response(serialize_document(hrs), status=status.HTTP_200_OK)
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+@api_view(['GET'])
+def get_all_reviews(request):
+    try:
+        all_reviews = list(reviews.find())
+        serialized = [serialize_document(r) for r in all_reviews]
+        return Response({'reviews': serialized}, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
 
 # POST - Add new HR
 @api_view(['POST'])
@@ -780,32 +834,77 @@ def archive_teacher(request, teacher_id):
         return Response({'error': str(e)}, status=500)
 
 
+# #Course creation
+
+# @api_view(['POST'])
+# def create_course(request):
+#     try:
+#         course_data = request.data
+#         print("Received course data:", course_data)  
+        
+       
+#         if not course_data.get('title'):
+#             return Response({'error': 'Course title is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+       
+        
+#         course_json = json.dumps(course_data)
+        
+       
+#         course_doc = {
+#             'title': course_data['title'],
+#             'created_at': datetime.now(),
+#             'updated_at': datetime.now(),
+#             'teacher_id': course_data.get('teacher_id'),
+#             'course_data_json': course_json  
+#         }
+        
+       
+#         result = courses_collection.insert_one(course_doc)
+#         course_id = str(result.inserted_id)
+        
+#         return Response({
+#             'message': 'Course created successfully',
+#             'course_id': course_id
+#         }, status=status.HTTP_201_CREATED)
+        
+#     except Exception as e:
+#         import traceback
+#         print("Error:", traceback.format_exc())  # Detailed error logging
+#         return Response(
+#             {'error': f'Failed to create course: {str(e)}'}, 
+#             status=status.HTTP_500_INTERNAL_SERVER_ERROR
+#         )
 #Course creation
 
 @api_view(['POST'])
 def create_course(request):
     try:
         course_data = request.data
-        print("Received course data:", course_data)  
+        print("Received course data:", course_data)
         
-       
         if not course_data.get('title'):
             return Response({'error': 'Course title is required'}, status=status.HTTP_400_BAD_REQUEST)
         
-       
+        # Handle file uploads
+        chapters = course_data.get('chapters', [])
+        for chapter in chapters:
+            for content in chapter.get('contents', []):
+                if content['type'] in ['image', 'video', 'pdf']:
+                    if 'file' in content and content['file']:
+                        # Store the file data directly in the content
+                        content['file_data'] = content['file']
+                        del content['file']
         
-        course_json = json.dumps(course_data)
-        
-       
         course_doc = {
             'title': course_data['title'],
-            'created_at': datetime.datetime.now(),
-            'updated_at': datetime.datetime.now(),
+            'created_at': datetime.now(),
+            'updated_at': datetime.now(),
             'teacher_id': course_data.get('teacher_id'),
-            'course_data_json': course_json  
+            'chapters': chapters,
+            'custom_content_types': course_data.get('custom_content_types', [])
         }
         
-       
         result = courses_collection.insert_one(course_doc)
         course_id = str(result.inserted_id)
         
@@ -816,7 +915,7 @@ def create_course(request):
         
     except Exception as e:
         import traceback
-        print("Error:", traceback.format_exc())  # Detailed error logging
+        print("Error:", traceback.format_exc())
         return Response(
             {'error': f'Failed to create course: {str(e)}'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -849,7 +948,9 @@ def update_course(request, course_id):
         # Prepare the update document
         update_doc = {
             "title": update_data.get('title', existing_course.get('title', '')),
-            "updated_at": datetime.datetime.utcnow(),
+            "updated_at": datetime.now(),
+            
+            
             "course_data_json": json.dumps(course_data_json)
         }
 
@@ -887,31 +988,70 @@ def update_course(request, course_id):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+from bson import ObjectId
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+import json
+from datetime import datetime
+
 @api_view(['GET'])
 def get_course(request, course_id):
+    print(f"Received request for course ID: {course_id}")
     try:
-        
+        if not ObjectId.is_valid(course_id):
+            return Response({'error': 'Invalid course ID format'}, status=status.HTTP_400_BAD_REQUEST)
 
-        
+        print(f"Searching for course with ID: {course_id}")
         course = courses_collection.find_one({'_id': ObjectId(course_id)})
+        
         if not course:
+            print("Course not found in database")
             return Response({'error': 'Course not found'}, status=status.HTTP_404_NOT_FOUND)
         
-        # Parse the stored JSON data if it exists
+        # Convert ObjectId and datetime objects to strings
+        course['_id'] = str(course['_id'])
+        if 'created_at' in course:
+            course['created_at'] = course['created_at'].isoformat() if isinstance(course['created_at'], datetime) else str(course['created_at'])
+        if 'updated_at' in course:
+            course['updated_at'] = course['updated_at'].isoformat() if isinstance(course['updated_at'], datetime) else str(course['updated_at'])
+        
+        # Parse and merge course_data_json if it exists
+        if 'course_data_json' in course and course['course_data_json']:
+            try:
+                json_data = json.loads(course['course_data_json'])
+                # Merge the JSON data while preserving original metadata
+                merged_data = {
+                    **course,
+                    **json_data,
+                    '_id': course['_id'],
+                    'created_at': course['created_at'],
+                    'updated_at': course['updated_at'],
+                    'teacher_id': course.get('teacher_id')
+                }
+                course = merged_data
+            except json.JSONDecodeError as e:
+                print(f"Failed to parse course_data_json: {str(e)}")
+                # Continue with original data if parsing fails
+        
+        # Remove the course_data_json field as we've merged it
         if 'course_data_json' in course:
-            course_data = json.loads(course['course_data_json'])
-            # Merge the parsed data with the course document
-            course.update(course_data)
-            # Remove the JSON string as we now have the parsed data
             del course['course_data_json']
         
-        # Convert ObjectId and datetime objects to strings
-        course['_id'] = str(course['_id'])  # Convert ObjectId to string
-        if 'created_at' in course:
-            course['created_at'] = str(course['created_at'])
-        if 'updated_at' in course:
-            course['updated_at'] = str(course['updated_at'])
+        # Ensure chapters and contents exist
+        if 'chapters' not in course:
+            course['chapters'] = []
         
+        # Convert any ObjectIds in chapters/contents
+        for chapter in course['chapters']:
+            if 'id' in chapter:
+                chapter['id'] = str(chapter['id'])
+            if 'contents' in chapter:
+                for content in chapter['contents']:
+                    if 'id' in content:
+                        content['id'] = str(content['id'])
+        
+        print("Processed course data:", course)
         return Response(course, status=status.HTTP_200_OK)
         
     except Exception as e:
@@ -1330,7 +1470,7 @@ def save_course_content(request, course_id):
             {
                 '$set': {
                     'chapters': sorted_chapters,
-                    'updated_at': datetime.datetime.utcnow()
+                    'updated_at': datetime.now()
                 }
             }
         )
@@ -1395,6 +1535,7 @@ def update_course_status(request, course_id):
             {"error": str(e)}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+        from datetime import datetime
 @api_view(['DELETE'])
 def delete_course(request, course_id):
     """
@@ -1418,7 +1559,7 @@ def delete_course(request, course_id):
         # Prepare deleted course document
         deleted_course = {
             "original_data": course,  # Store entire course document
-            "deleted_at": datetime.datetime.utcnow(),
+            "deleted_at": datetime.now(),
             "deleted_by": request.user.id if hasattr(request, 'user') else None,
             "reason": request.data.get('reason', 'No reason provided')
         }
@@ -1514,7 +1655,7 @@ def delete_blog(request, blog_id):
         # Prepare deleted blog document
         deleted_blog = {
             "original_data": blog,  # Store entire blog document
-            "deleted_at": datetime.datetime.utcnow(),
+            "deleted_at": datetime.now(),
             "deleted_by": request.user.id if hasattr(request, 'user') else None,
             "reason": request.data.get('reason', 'No reason provided')
         }
@@ -1611,7 +1752,7 @@ def delete_test(request, test_id):
         # Prepare deleted test document
         deleted_test = {
             "original_data": test,  # Store entire test document
-            "deleted_at": datetime.datetime.utcnow(),
+            "deleted_at": datetime.now(),
             "deleted_by": request.user.id if hasattr(request, 'user') else None,
             "reason": request.data.get('reason', 'No reason provided'),
             "test_type": test.get('type', 'assessment')  # Store test type for reference
@@ -1954,7 +2095,7 @@ def submit_test(request):
             "answers": answers,
             "score": score,
             "time_spent": time_spent,
-            "submitted_at": datetime.datetime.now(),
+            "submitted_at": datetime.now(),
             "status": "completed",
             "ai_evaluated": score.get('ai_evaluated', False)  # Add flag if AI was used
         }
@@ -2228,7 +2369,7 @@ def login_react_teacher(request):
             "id": str(teacher["_id"]),
             "username": teacher["username"],
             "role": role,
-            "exp": datetime.datetime.utcnow() + datetime.timedelta(days=1),  
+            "exp":datetime.now() + timedelta(days=1),  
         }
         access_token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
 
@@ -2356,7 +2497,7 @@ def signup_react_teacher(request):
         "is_active": True,
         "is_staff": False,
         "is_superuser": False,
-        "date_joined": datetime.datetime.utcnow(),
+        "date_joined": datetime.now(),
     }
     print(teacher_data)
     teacher_collection.insert_one(teacher_data)
